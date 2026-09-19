@@ -1,72 +1,67 @@
-<script>
-(function(){
-"use strict";
-var API="https://cdn.jsdelivr.net/gh/123zxy12/msk-schedule@main/data.json";
-var DATA=[],curPlay="全部",curActor=null,calMode=false;
-function $(id){return document.getElementById(id)}
-function pad(n){return n<10?"0"+n:n}
-function notice(msg,ok){var n=$("notice");n.textContent=msg;n.className="notice show "+(ok?"ok":"err");setTimeout(function(){n.className="notice"},2500)}
-function todayStr(){var d=new Date();return pad(d.getMonth()+1)+"-"+pad(d.getDate())}
-function getPlays(){var p=["全部"];DATA.forEach(function(a){var t=a.role.replace(/[《》]/g,"").split("/")[0].trim();if(p.indexOf(t)<0)p.push(t)});return p}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MSK 排期表</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f4f6f9; color: #333; }
+        header { background: #2c3e50; color: white; padding: 20px; text-align: center; }
+        h1 { margin: 0; font-size: 1.2rem; }
+        .container { max-width: 700px; margin: 20px auto; padding: 0 15px; }
+        .search-box { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; margin-bottom: 20px; }
+        .card { background: white; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .actor-name { font-size: 1.1rem; font-weight: bold; color: #2c3e50; margin: 0 0 5px 0; }
+        .actor-role { color: #7f8c8d; font-size: 0.85rem; }
+        .actor-bio { color: #666; font-size: 0.85rem; margin: 10px 0; line-height: 1.5; }
+        .month-title { font-size: 0.9rem; font-weight: bold; color: #3498db; margin: 15px 0 8px 0; }
+        .show-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee; font-size: 0.85rem; }
+        .show-item:last-child { border-bottom: none; }
+        .empty-state { text-align: center; color: #999; padding: 40px 0; }
+    </style>
+</head>
+<body>
+    <header><h1>🎭 演职人员排期表</h1></header>
+    <div class="container">
+        <input type="text" id="search" class="search-box" placeholder="搜索演员、剧名或剧院...">
+        <div id="app" class="empty-state">加载中...</div>
+    </div>
+    <script>
+        let allData = [];
+        fetch('./data.json')
+            .then(res => res.json())
+            .then(data => {
+                allData = data;
+                render(allData);
+            })
+            .catch(() => document.getElementById('app').innerHTML = '加载失败，请检查 data.json 是否存在');
 
-function renderTags(){var box=$("filter-tags");box.innerHTML="";getPlays().forEach(function(p){
-  var el=document.createElement("div");el.className="filter-tag"+(p===curPlay?" active":"");el.textContent=p;
-  el.addEventListener("click",function(){curPlay=p;box.querySelectorAll(".filter-tag").forEach(function(t){t.className="filter-tag"});el.className="filter-tag active";renderList()});
-  box.appendChild(el)})}
+        function render(data) {
+            if (data.length === 0) {
+                document.getElementById('app').innerHTML = '<div class="empty-state">无匹配数据</div>';
+                return;
+            }
+            let html = '';
+            data.forEach(p => {
+                html += `<div class="card"><h2 class="actor-name">${p.name}</h2><div class="actor-role">${p.role || ''}</div>`;
+                if (p.bio) html += `<div class="actor-bio">${p.bio}</div>`;
+                p.schedule.forEach(m => {
+                    html += `<div class="month-title">${m.month}</div>`;
+                    m.shows.forEach(s => {
+                        html += `<div class="show-item"><span>📅 ${s.date}</span><span>🎭 ${s.play}</span><span>📍 ${s.theater}</span></div>`;
+                    });
+                });
+                html += `</div>`;
+            });
+            document.getElementById('app').innerHTML = html;
+        }
 
-function renderList(){var ul=$("actor-list"),kw=($("search-input").value||"").trim().toLowerCase();ul.innerHTML="";
-  DATA.forEach(function(a){if(curPlay!=="全部"&&a.role.indexOf(curPlay)<0)return;
-    if(kw&&a.name.toLowerCase().indexOf(kw)<0&&a.role.toLowerCase().indexOf(kw)<0)return;
-    var li=document.createElement("li"),d=document.createElement("div"),n=document.createElement("a");
-    n.className="actor-name";n.href="#";n.textContent=a.name;
-    n.addEventListener("click",function(e){e.preventDefault();openDetail(DATA.indexOf(a))});
-    var r=document.createElement("div");r.className="actor-role";r.textContent=a.role;d.appendChild(n);d.appendChild(r);li.appendChild(d);ul.appendChild(li)});
-  if(!ul.children.length)ul.innerHTML='<div class="empty">没有找到匹配的演员</div>'}
-
-function renderToday(){$("today-date").textContent=new Date().toLocaleDateString("zh-CN",{year:"numeric",month:"long",day:"numeric",weekday:"long"});
-  var box=$("today-list"),t=todayStr(),f=[];
-  DATA.forEach(function(a){a.schedule.forEach(function(m){m.shows.forEach(function(s){if(s.date.indexOf(t)===0)f.push({actor:a.name,play:s.play,theater:s.theater,time:s.date.split(" ").slice(1).join(" ")})})})});
-  box.innerHTML=f.length?f.map(function(x){return '<div class="today-item"><div><div class="today-play">'+x.play+' · '+x.actor+'</div><div class="today-theater">'+x.theater+'</div></div><div class="today-time">'+x.time+'</div></div>'}).join(""):'<div class="empty">今日暂无排期</div>'}
-
-function openDetail(i){curActor=DATA[i];calMode=false;$("detail-name").textContent=curActor.name;$("detail-bio").textContent=curActor.bio;buildList();buildCal();paintView();$("home-page").className="page";$("detail-page").className="page active";window.scrollTo(0,0)}
-function goHome(){$("detail-page").className="page";$("home-page").className="page active";curActor=null}
-function paintView(){$("view-list").className=calMode?"view-section":"view-section active";$("view-cal").className=calMode?"view-section active":"view-section";$("btn-list").className=calMode?"btn btn-secondary":"btn";$("btn-cal").className=calMode?"btn":"btn btn-secondary"}
-
-function buildList(){var box=$("view-list");box.innerHTML="";curActor.schedule.forEach(function(m){
-  var tb='<table class="schedule-table"><tr><th>日期时间</th><th>剧场</th><th>剧目</th></tr>';
-  m.shows.forEach(function(s){tb+='<tr><td>'+s.date+'</td><td>'+s.theater+'</td><td>'+s.play+'</td></tr>'});
-  box.innerHTML+='<div class="month-section"><div class="month-title">'+m.month+'</div>'+tb+'</table></div>'})}
-
-function buildCal(){var box=$("view-cal");box.innerHTML="";curActor.schedule.forEach(function(m){
-  var sec=document.createElement("div");sec.className="month-section";sec.innerHTML='<div class="month-title">'+m.month+'</div>';
-  var g=document.createElement("div");g.className="calendar-grid";
-  ["日","一","二","三","四","五","六"].forEach(function(w){var h=document.createElement("div");h.className="cal-head";h.textContent=w;g.appendChild(h)});
-  var mm=/(\d{4})年\s*(\d{1,2})月/.exec(m.month),yr=mm?+mm[1]:new Date().getFullYear(),mo=mm?(+mm[2])-1:0;
-  var first=new Date(yr,mo,1).getDay(),days=new Date(yr,mo+1,0).getDate(),ts=todayStr();
-  for(var i=0;i<first;i++){var e=document.createElement("div");e.className="cal-day empty";g.appendChild(e)}
-  for(var d=1;d<=days;d++){var c=document.createElement("div");c.className="cal-day";var ds=pad(mo+1)+"-"+pad(d);
-    if(ds===ts)c.className+=" today";c.innerHTML='<div class="cal-num">'+d+'</div>';
-    m.shows.forEach(function(s){if(s.date.indexOf(ds)===0){var tag=document.createElement("span");tag.className="cal-tag";tag.textContent=s.play+" "+s.date.split(" ").slice(-1)[0];c.appendChild(tag)}});
-    g.appendChild(c)}sec.appendChild(g);box.appendChild(sec)})}
-
-function syncData(){
-  if(!API){notice("未配置数据源",false);return}
-  fetch(API+"?t="+Date.now(),{cache:"no-store"})
-  .then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})
-  .then(function(list){if(!Array.isArray(list))throw new Error("格式错误");DATA=list;
-    try{localStorage.setItem("msk_data",JSON.stringify(list));localStorage.setItem("msk_ts",Date.now())}catch(e){}
-    renderTags();renderList();renderToday();if(curActor){buildList();buildCal()}notice("数据已更新",true)})
-  .catch(function(e){console.warn(e);
-    var c=localStorage.getItem("msk_data");
-    if(c)try{DATA=JSON.parse(c);renderTags();renderList();renderToday();notice("已使用缓存",false)}catch(e2){notice("加载失败，请检查地址",false)}
-    else notice("首次加载失败",false)})}
-
-$("search-input").addEventListener("input",renderList);
-$("btn-back").addEventListener("click",goHome);
-$("btn-list").addEventListener("click",function(){calMode=false;paintView()});
-$("btn-cal").addEventListener("click",function(){calMode=true;paintView()});
-$("btn-sync").addEventListener("click",syncData);
-(function(){var c=localStorage.getItem("msk_data");if(c)try{DATA=JSON.parse(c)}catch(e){}})();
-renderTags();renderList();renderToday();syncData();setInterval(syncData,1800000);
-})();
-</script>
+        document.getElementById('search').addEventListener('input', e => {
+            const kw = e.target.value.toLowerCase();
+            if (!kw) { render(allData); return; }
+            const filtered = allData.filter(p => JSON.stringify(p).toLowerCase().includes(kw));
+            render(filtered);
+        });
+    </script>
+</body>
+</html>
